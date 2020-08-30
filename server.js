@@ -17,12 +17,21 @@ app.get("/location", (req, res) => {
     const locData = require("./data/location.json")
 
     const cityData = req.query.city;
-
     let location = new ObjectLocation(cityData, locData)
-    res.send(location);
+
+    let display_nameArray = locData[0].display_name.split(", ")
+    display_nameArray.push(undefined)
+    console.log(display_nameArray)
+    let error = display_nameArray.includes(cityData)
+    if (error) {
+        res.send(location)
+    } else {
+        res.status(500).send("Sorry, something went wrong ");
+    }
+
 })
 
-function ObjectLocation(cityData, locData){
+function ObjectLocation(cityData, locData) {
     this.search_query = cityData
     this.formatted_query = locData[0].display_name
     this.latitude = locData[0].lat
@@ -30,10 +39,10 @@ function ObjectLocation(cityData, locData){
 }
 
 
-app.get('/weather' ,(req, res)=>{
+app.get('/weather', (req, res) => {
     const wethData = require("./data/weather.json").data
-    
-    let wethDataEachHour =[]
+
+    let wethDataEachHour = []
     wethData.forEach(item => {
         let hours = new ObjectWeather(item);
         wethDataEachHour.push(hours)
@@ -41,8 +50,8 @@ app.get('/weather' ,(req, res)=>{
     res.send(wethDataEachHour);
 })
 
-function ObjectWeather(item){
-    this.forecast =  item.weather.description
+function ObjectWeather(item) {
+    this.forecast = item.weather.description
     this.time = item.datetime
 }
 
@@ -50,7 +59,7 @@ app.use('*', (req, res) => {
     res.status(404).send('NOT FOUND');
 })
 
-app.use(("/location", req, res) => {
+app.use((error, req, res) => {
     res.status(500).send("Sorry, something went wrong");
 })
 
