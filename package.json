@@ -4,9 +4,11 @@
   "description": "",
   "main": "server.js",
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "epress": "^0.0.1-security",
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "superagent": "^6.1.0"
   },
   "devDependencies": {},
   "scripts": {
