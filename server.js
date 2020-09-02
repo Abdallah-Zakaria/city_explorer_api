@@ -13,6 +13,9 @@ const client = new pg.Client(process.env.DATABASE_URL);
 
 app.use(cors())
 
+let cordinate = [];
+let areaName;
+
 app.get("/", (req, res) => {
     res.status(200).send('you are doing great');
 })
@@ -20,6 +23,8 @@ app.get("/", (req, res) => {
 app.get('/location', locationHandler);
 app.get('/weather', weatherHandler);
 app.get('/trails', trailHandler);
+app.get('/movies', movieHandler);
+app.get('/yelp', yelpHandler);
 app.use('*', notFoundHandler);
 app.use(errorHandler);
 
@@ -53,14 +58,16 @@ async function locationHandler(request, response) {
     const city = request.query.city;
     let API_allowed = await checkDB(city);
     if (API_allowed === true) {
-        await getLocation(city).then((data) => {
-            saveLocDB(data).then((sData) => {
+        await getLocation(city, areaName).then((data) => {
+            saveLocDB(data, areaName).then((sData) => {
                 response.status(200).json(sData);
             });
         });
     } else {
-        delete API_allowed[0].id;
-        response.status(200).json(API_allowed[0]);
+        await getLocation(city, areaName).then(data => {
+            delete API_allowed[0].id;
+            response.status(200).json(API_allowed[0]);
+        })
     }
 }
 
@@ -76,7 +83,7 @@ function getLocation(city) {
         })
 }
 
-let cordinate = [];
+
 
 function ObjectLocation(cityData, locData) {
     this.search_query = cityData
@@ -84,6 +91,13 @@ function ObjectLocation(cityData, locData) {
     this.latitude = locData[0].lat
     this.longitude = locData[0].lon
     cordinate.push(this.latitude, this.longitude)
+    let lengthFQ = this.formatted_query.split(', ')
+
+    if (lengthFQ.length == 1) {
+        areaName = lengthFQ[0];
+    } else {
+        areaName = lengthFQ[lengthFQ.length - 1];
+    }
 }
 
 function weatherHandler(request, response) {
@@ -99,7 +113,6 @@ function getWeather(search_query) {
     return superagent.get(url)
 
         .then(data => {
-            console.log(data.body)
             let eightDays = data.body.data;
             let eightDaysMap = eightDays.map((item) => {
                 return new ObjectWeather(item);
@@ -123,11 +136,9 @@ function trailHandler(request, response) {
 function getTrail(cordinate) {
     let key = process.env.TRAIL_API_KEY;
     const url = `https://www.hikingproject.com/data/get-trails?lat=${cordinate[0]}&lon=${cordinate[1]}&maxResults=10&key=${key}`;
-    console.log(cordinate)
     return superagent.get(url)
 
         .then(data => {
-            console.log(data.body.trails)
             let tenTrails = data.body.trails;
             let tenTrailsMap = tenTrails.map((item) => {
                 return new Trail(item);
@@ -147,6 +158,86 @@ function Trail(trailData) {
     this.conditions = trailData.conditionDetails;
     this.condition_date = trailData.conditionDate.split(" ")[0];
     this.condition_time = trailData.conditionDate.split(" ")[1];
+}
+
+
+function movieHandler(request, response) {
+    getMovie(areaName)
+        .then(dataMovie => response.status(200).json(dataMovie));
+}
+
+async function getMovie(areaName) {
+    let key = process.env.MOVIE_API_KEY;
+    const areaURL = `https://api.themoviedb.org/3/configuration/countries?api_key=${key}`;
+    let x;
+    let isoName;
+    await superagent.get(areaURL).then(data => {
+        let isoArr = data.body;
+
+        isoArr.forEach((item, index) => {
+            if (item.english_name == areaName) {
+                x = index;
+            }else if(areaName == "USA"){
+                x = 226;
+            }
+
+        })
+        isoName = isoArr[x].iso_3166_1;
+    })
+
+    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${key}&region=${isoName}&sort_by=popularity.desc`;
+
+    return superagent.get(url)
+    .then(data =>{
+        let twnMovies = data.body.results;
+        let twnMoviesMap = twnMovies.map((item) =>{
+            return new Movie(item);
+        })
+        return twnMoviesMap;
+    })
+    .catch((err) => {
+        console.log("Error", err);
+    });
+}
+
+function Movie(movieData) {
+    this.title = movieData.title;
+    this.overview = movieData.overview;
+    this.average_votes = movieData.average_votes;
+    this.total_votes = movieData.total_votes;
+    this.image_url = movieData.image_url;
+    this.popularity = movieData.popularity;
+    this.released_on = movieData.released_on;
+}
+
+function yelpHandler(request, response) {
+    getYelp(cordinate)
+        .then(dataYelp => response.status(200).json(dataYelp));
+}
+
+async function getYelp(cordinate) {
+    let key = process.env.YELP_API_KEY;
+    const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${cordinate[0]}&longitude=${cordinate[1]}`;
+
+    return superagent.get(url).set("Authorization", `Bearer ${key}`)
+    .then(data =>{
+        let twnRestaurants = data.body.businesses;
+        let twnRestaurantsMap = twnRestaurants.map((item) =>{
+            return new Yelp(item);
+        })
+        return twnRestaurantsMap;
+    })
+    .catch((err) => {
+        console.log("Error", err);
+    });
+}
+
+function Yelp(yelpData) {
+    this.name = yelpData.name;
+    this.image_url = yelpData.image_url;
+    this.price = yelpData.price;
+    this.rating = yelpData.rating;
+    this.url = yelpData.url;
 }
 
 
