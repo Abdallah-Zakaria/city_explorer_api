@@ -1,6 +1,6 @@
 # City Explorer
 
-**Author**: Abdulhakim Zatar
+**Author**:  Abdallah Zakaria
 **Version**: 1.1.0
 
 ## Overview
@@ -17,8 +17,10 @@ html, css, js.
 31-08-2020 5:30pm 1.1.0 - Application now has route for the location, weather and trail resource using APIs.
 
 ## Credits and Collaborations
-Pair programming with Abdallah Zakaria for lab06.
-Pair programming with Abdallah Zakaria for lab07.
+Pair programming with Abdulhakim Zatar for lab06.
+Pair programming with Abdulhakim Zatar for lab07.
+Pair programming with Abdulhakim Zatar for lab08.
+Pair programming with Abdulhakim Zatar for lab09.
 
 ## Time Estimate
 
