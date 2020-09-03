@@ -1,5 +1,6 @@
 "use strict"
-
+// dependency 
+/* ------------------------------------------------------------------------------------------------------*/
 const express = require('express');
 require('dotenv').config();
 const cors = require("cors");
@@ -16,18 +17,42 @@ app.use(cors())
 let cordinate = [];
 let areaName;
 
+// default page
 app.get("/", (req, res) => {
     res.status(200).send('you are doing great');
 })
 
+// main routes
+/* ------------------------------------------------------------------------------------------------------*/
 app.get('/location', locationHandler);
 app.get('/weather', weatherHandler);
 app.get('/trails', trailHandler);
 app.get('/movies', movieHandler);
-app.get('/yelp', yelpHandler);
-app.use('*', notFoundHandler);
-app.use(errorHandler);
+app.get('/yelp', yelpHandler); 
+app.use('*', notFoundHandler); // for any route doesn't existing
+app.use(errorHandler); 
 
+// functions for the locations 
+/* ------------------------------------------------------------------------------------------------------*/
+async function locationHandler(request, response) {
+    const city = request.query.city;
+    let API_allowed = await checkDB(city); // #1
+    if (API_allowed === true) {
+        await getLocation(city, areaName).then((data) => { // #2 
+            saveLocDB(data, areaName).then((sData) => { // #3
+                response.status(200).json(sData);
+            });
+        });
+    } else {
+        await getLocation(city, areaName).then(data => { // #2 
+            delete API_allowed[0].id;
+            response.status(200).json(API_allowed[0]);
+        })
+    }
+}
+
+
+// #1
 function checkDB(city) {
     let SQL = `SELECT * FROM locations WHERE search_query=$1;`;
     let values = [city];
@@ -42,35 +67,7 @@ function checkDB(city) {
         })
 }
 
-function saveLocDB(data) {
-    let SQL = `INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);`;
-    let values = [data.search_query, data.formatted_query, data.latitude, data.longitude,];
-    return client.query(SQL, values)
-        .then((result) => {
-            return data;
-        })
-        .catch((err) => {
-            console.log("Error", err);
-        });
-}
-
-async function locationHandler(request, response) {
-    const city = request.query.city;
-    let API_allowed = await checkDB(city);
-    if (API_allowed === true) {
-        await getLocation(city, areaName).then((data) => {
-            saveLocDB(data, areaName).then((sData) => {
-                response.status(200).json(sData);
-            });
-        });
-    } else {
-        await getLocation(city, areaName).then(data => {
-            delete API_allowed[0].id;
-            response.status(200).json(API_allowed[0]);
-        })
-    }
-}
-
+// #2 
 function getLocation(city) {
     let key = process.env.GEOCODE_API_KEY;
     const url = `https://eu1.locationiq.com/v1/search.php?key=${key}&q=${city}&format=json&limit=1`;
@@ -83,8 +80,6 @@ function getLocation(city) {
         })
 }
 
-
-
 function ObjectLocation(cityData, locData) {
     this.search_query = cityData
     this.formatted_query = locData[0].display_name
@@ -92,6 +87,7 @@ function ObjectLocation(cityData, locData) {
     this.longitude = locData[0].lon
     cordinate.push(this.latitude, this.longitude)
     let lengthFQ = this.formatted_query.split(', ')
+    console.log(lengthFQ)
 
     if (lengthFQ.length == 1) {
         areaName = lengthFQ[0];
@@ -100,12 +96,29 @@ function ObjectLocation(cityData, locData) {
     }
 }
 
+// #3
+function saveLocDB(data) {
+    let SQL = `INSERT INTO locations (search_query,formatted_query,latitude,longitude) VALUES ($1,$2,$3,$4);`;
+    let values = [data.search_query, data.formatted_query, data.latitude, data.longitude,];
+    return client.query(SQL, values)
+        .then((result) => {
+            return data;
+        })
+        .catch((err) => {
+            console.log("Error", err);
+        });
+}
+
+
+// functions for the weather 
+/* ------------------------------------------------------------------------------------------------------*/
 function weatherHandler(request, response) {
     const search_query = request.query.search_query;
-    getWeather(search_query)
+    getWeather(search_query)// #1
         .then(dataWeather => response.status(200).json(dataWeather));
 }
 
+// #1
 function getWeather(search_query) {
     let key = process.env.WEATHER_API_KEY;
     const url = `http://api.weatherbit.io/v2.0/forecast/daily?key=${key}&city=${search_query}&days=8`;
@@ -126,13 +139,14 @@ function ObjectWeather(weatherData) {
     this.time = weatherData.datetime
 }
 
-
-
+// functions for the trail 
+/* ------------------------------------------------------------------------------------------------------*/
 function trailHandler(request, response) {
-    getTrail(cordinate)
+    getTrail(cordinate) // #1
         .then(dataTrail => response.status(200).json(dataTrail));
 }
 
+// #1
 function getTrail(cordinate) {
     let key = process.env.TRAIL_API_KEY;
     const url = `https://www.hikingproject.com/data/get-trails?lat=${cordinate[0]}&lon=${cordinate[1]}&maxResults=10&key=${key}`;
@@ -160,12 +174,14 @@ function Trail(trailData) {
     this.condition_time = trailData.conditionDate.split(" ")[1];
 }
 
-
+// functions for the movie 
+/* ------------------------------------------------------------------------------------------------------*/
 function movieHandler(request, response) {
-    getMovie(areaName)
+    getMovie(areaName) // #1
         .then(dataMovie => response.status(200).json(dataMovie));
 }
 
+// #1
 async function getMovie(areaName) {
     let key = process.env.MOVIE_API_KEY;
     const areaURL = `https://api.themoviedb.org/3/configuration/countries?api_key=${key}`;
@@ -175,7 +191,7 @@ async function getMovie(areaName) {
         let isoArr = data.body;
 
         isoArr.forEach((item, index) => {
-            if (item.english_name == areaName) {
+            if (item.english_name == areaName ) {
                 x = index;
             }else if(areaName == "USA"){
                 x = 226;
@@ -210,15 +226,19 @@ function Movie(movieData) {
     this.released_on = movieData.released_on;
 }
 
+// functions for the yelp 
+/* ------------------------------------------------------------------------------------------------------*/
 function yelpHandler(request, response) {
-    getYelp(cordinate)
+    getYelp(cordinate) // #1
         .then(dataYelp => response.status(200).json(dataYelp));
 }
 
-async function getYelp(cordinate) {
+// #1
+function getYelp(cordinate) {
     let key = process.env.YELP_API_KEY;
     const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${cordinate[0]}&longitude=${cordinate[1]}`;
 
+    //set the Authorization HTTP header value as Bearer API_KEY 
     return superagent.get(url).set("Authorization", `Bearer ${key}`)
     .then(data =>{
         let twnRestaurants = data.body.businesses;
@@ -243,7 +263,8 @@ function Yelp(yelpData) {
 
 
 
-
+// functions for the error and wrong route
+/* ------------------------------------------------------------------------------------------------------*/
 function notFoundHandler(request, response) {
     response.status(404).send('huh?');
 }
@@ -253,7 +274,8 @@ function errorHandler(error, request, response) {
 }
 
 
-
+// function to make sure to link data before start 
+/* ------------------------------------------------------------------------------------------------------*/
 client.connect()
     .then(() => {
         app.listen(PORT, () =>
